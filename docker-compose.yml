@@ -1,0 +1,58 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: chatgroup-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: senha
+      MYSQL_DATABASE: chatdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psenha"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+
+  chat-server:
+    build:
+      context: ./chat-server
+      dockerfile: Dockerfile
+    container_name: chatgroup-server
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/chatdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USER: root
+      DB_PASS: senha
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8000'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  chatclient:
+    build:
+      context: ./chatclient
+      dockerfile: Dockerfile
+    container_name: chatgroup-client
+    profiles:
+      - gui
+    environment:
+      SERVER_URL: http://chat-server:8000
+      DISPLAY: ${DISPLAY:-host.docker.internal:0.0}
+    depends_on:
+      chat-server:
+        condition: service_healthy
+
+volumes:
+  mysql_data:

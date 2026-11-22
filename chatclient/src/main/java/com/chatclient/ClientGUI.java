@@ -11,7 +11,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ClientGUI extends JFrame {
-    private static final String SERVER_URL = "http://localhost:8000";
+    private static final String SERVER_URL = System.getenv().getOrDefault("SERVER_URL", "http://localhost:8000");
     private final Gson gson = new Gson();
 
     private JTextField nicknameField;

@@ -16,7 +16,11 @@ public class Server {
         Logger rootLogger = Logger.getLogger("");
         rootLogger.setLevel(Level.INFO);
 
-        DB.connect("jdbc:mysql://localhost:3306/chatdb?useSSL=false&serverTimezone=UTC", "root", "senha");
+        String dbUrl = System.getenv().getOrDefault("DB_URL", "jdbc:mysql://localhost:3306/chatdb?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC");
+        String dbUser = System.getenv().getOrDefault("DB_USER", "root");
+        String dbPass = System.getenv().getOrDefault("DB_PASS", "senha");
+
+        DB.connect(dbUrl, dbUser, dbPass);
 
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
 
