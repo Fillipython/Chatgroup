@@ -6,20 +6,46 @@ import java.util.logging.*;
 
 public class DB {
     private static final Logger logger = Logger.getLogger("DB");
-    private static Connection conn;
+    private static String dbUrl;
+    private static String dbUser;
+    private static String dbPass;
 
     public static void connect(String url, String user, String pass) throws SQLException {
-        conn = DriverManager.getConnection(url, user, pass);
-        logger.info("Connected to DB");
+        dbUrl = url;
+        dbUser = user;
+        dbPass = pass;
+        try (Connection testConn = getConnection()) {
+            logger.info("Connected to DB");
+        }
+    }
+
+    private static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(dbUrl, dbUser, dbPass);
     }
 
     public static int createGroup(String name) throws SQLException {
-        String sql = "INSERT INTO grupos (name) VALUES (?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, name);
-            ps.executeUpdate();
-            try (ResultSet rs = ps.getGeneratedKeys()) {
-                if (rs.next()) return rs.getInt(1);
+        String selectSql = "SELECT id FROM grupos WHERE name = ?";
+        try (Connection conn = getConnection()) {
+            try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+                ps.setString(1, name);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) return rs.getInt("id");
+                }
+            }
+            String insertSql = "INSERT INTO grupos (name) VALUES (?)";
+            try (PreparedStatement ps = conn.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, name);
+                ps.executeUpdate();
+                try (ResultSet rs = ps.getGeneratedKeys()) {
+                    if (rs.next()) return rs.getInt(1);
+                }
+            } catch (SQLIntegrityConstraintViolationException e) {
+                try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+                    ps.setString(1, name);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) return rs.getInt("id");
+                    }
+                }
             }
         }
         throw new SQLException("Failed to create group");
@@ -27,8 +53,9 @@ public class DB {
 
     public static List<Map<String, Object>> listGroups() throws SQLException {
         List<Map<String, Object>> groups = new ArrayList<>();
-        String sql = "SELECT id, name FROM grupos";
-        try (Statement st = conn.createStatement();
+        String sql = "SELECT id, name FROM grupos ORDER BY id ASC";
+        try (Connection conn = getConnection();
+             Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
                 Map<String, Object> g = new HashMap<>();
@@ -42,7 +69,8 @@ public class DB {
 
     public static boolean postMessage(int groupId, String idemKey, String nickname, String text, long timestampClient) throws SQLException {
         String sql = "INSERT INTO messages (grupo_id, idem_key, nickname, text, timestamp_client) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, groupId);
             ps.setString(2, idemKey);
             ps.setString(3, nickname);
@@ -58,14 +86,16 @@ public class DB {
 
     public static List<Map<String, Object>> getMessages(int groupId, long since, int limit) throws SQLException {
         List<Map<String, Object>> messages = new ArrayList<>();
-        String sql = "SELECT nickname, text, timestamp_client, timestamp_server FROM messages WHERE grupo_id = ? AND timestamp_server > ? ORDER BY timestamp_server ASC LIMIT ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "SELECT id, nickname, text, timestamp_client, timestamp_server FROM messages WHERE grupo_id = ? AND timestamp_server >= ? ORDER BY timestamp_server ASC, id ASC LIMIT ?";
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, groupId);
             ps.setTimestamp(2, new Timestamp(since));
             ps.setInt(3, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Map<String, Object> m = new HashMap<>();
+                    m.put("id", rs.getLong("id"));
                     m.put("nickname", rs.getString("nickname"));
                     m.put("text", rs.getString("text"));
                     m.put("timestamp_client", rs.getLong("timestamp_client"));

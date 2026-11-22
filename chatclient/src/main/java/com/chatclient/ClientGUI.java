@@ -43,6 +43,7 @@ public class ClientGUI extends JFrame {
         initComponents();
         loadGroups();
         scheduler.scheduleAtFixedRate(this::pollMessages, 1, 1, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(this::loadGroups, 5, 5, TimeUnit.SECONDS);
     }
 
     private void initComponents() {
@@ -133,19 +134,27 @@ public class ClientGUI extends JFrame {
                 java.lang.reflect.Type listType = new TypeToken<List<Map<String, Object>>>() {}.getType();
                 List<Map<String, Object>> groups = gson.fromJson(json, listType);
                 SwingUtilities.invokeLater(() -> {
-                    String selected = (String) groupComboBox.getSelectedItem();
-                    groupNameToId.clear();
-                    groupModel.removeAllElements();
+                    List<String> newNames = new ArrayList<>();
+                    Map<String, Integer> newMap = new HashMap<>();
                     if (groups != null) {
                         for (Map<String, Object> g : groups) {
                             String name = (String) g.get("name");
                             int id = ((Number) g.get("id")).intValue();
-                            groupNameToId.put(name, id);
-                            groupModel.addElement(name);
+                            newMap.put(name, id);
+                            newNames.add(name);
                         }
                     }
-                    if (selected != null && groupNameToId.containsKey(selected)) {
-                        groupComboBox.setSelectedItem(selected);
+                    if (!newMap.equals(groupNameToId)) {
+                        String selected = (String) groupComboBox.getSelectedItem();
+                        groupNameToId.clear();
+                        groupNameToId.putAll(newMap);
+                        groupModel.removeAllElements();
+                        for (String name : newNames) {
+                            groupModel.addElement(name);
+                        }
+                        if (selected != null && groupNameToId.containsKey(selected)) {
+                            groupComboBox.setSelectedItem(selected);
+                        }
                     }
                 });
             } catch (Exception ex) {
@@ -233,7 +242,10 @@ public class ClientGUI extends JFrame {
                         String text = (String) m.get("text");
                         long tsClient = ((Number) m.get("timestamp_client")).longValue();
                         long tsServer = ((Number) m.get("timestamp_server")).longValue();
-                        String msgKey = nick + ":" + tsClient + ":" + tsServer + ":" + text;
+                        Object idObj = m.get("id");
+                        String msgKey = (idObj != null)
+                                ? String.valueOf(((Number) idObj).longValue())
+                                : (nick + ":" + tsClient + ":" + tsServer + ":" + text);
                         if (displayedMessages.add(msgKey)) {
                             chatArea.append("[" + nick + "]: " + text + "\n");
                         }

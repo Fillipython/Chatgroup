@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS messages (
     text TEXT NOT NULL,
     nickname VARCHAR(100) NOT NULL DEFAULT 'anonymous',
     timestamp_client BIGINT NOT NULL,
-    timestamp_server TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    timestamp_server TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3),
     FOREIGN KEY (grupo_id) REFERENCES grupos(id) ON DELETE CASCADE,
     UNIQUE KEY unique_message (grupo_id, idem_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
