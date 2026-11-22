@@ -32,6 +32,7 @@ public class ClientGUI extends JFrame {
 
     private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private AtomicLong lastTimestampServer = new AtomicLong(0);
+    private final Set<String> displayedMessages = Collections.synchronizedSet(new HashSet<>());
 
     private final Random random = new Random();
 
@@ -161,6 +162,7 @@ public class ClientGUI extends JFrame {
             if (newId != currentGroupId) {
                 currentGroupId = newId;
                 lastTimestampServer.set(0);
+                displayedMessages.clear();
                 chatArea.setText("Joined group: " + selected + "\n");
                 pollMessages();
             }
@@ -210,7 +212,7 @@ public class ClientGUI extends JFrame {
         }).start();
     }
 
-    private void pollMessages() {
+    private synchronized void pollMessages() {
         int groupId = currentGroupId;
         if (groupId == -1) return;
         try {
@@ -219,14 +221,21 @@ public class ClientGUI extends JFrame {
             java.lang.reflect.Type listType = new TypeToken<List<Map<String, Object>>>() {}.getType();
             List<Map<String, Object>> messages = gson.fromJson(json, listType);
             if (messages != null && !messages.isEmpty()) {
+                for (Map<String, Object> m : messages) {
+                    long tsServer = ((Number) m.get("timestamp_server")).longValue();
+                    if (tsServer > lastTimestampServer.get()) {
+                        lastTimestampServer.set(tsServer);
+                    }
+                }
                 SwingUtilities.invokeLater(() -> {
                     for (Map<String, Object> m : messages) {
                         String nick = (String) m.get("nickname");
                         String text = (String) m.get("text");
+                        long tsClient = ((Number) m.get("timestamp_client")).longValue();
                         long tsServer = ((Number) m.get("timestamp_server")).longValue();
-                        chatArea.append("[" + nick + "]: " + text + "\n");
-                        if (tsServer > lastTimestampServer.get()) {
-                            lastTimestampServer.set(tsServer);
+                        String msgKey = nick + ":" + tsClient + ":" + tsServer + ":" + text;
+                        if (displayedMessages.add(msgKey)) {
+                            chatArea.append("[" + nick + "]: " + text + "\n");
                         }
                     }
                     chatArea.setCaretPosition(chatArea.getDocument().getLength());

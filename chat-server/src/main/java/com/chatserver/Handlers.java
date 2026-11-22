@@ -20,8 +20,8 @@ public class Handlers {
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Map<String, String> map = gson.fromJson(body, Map.class);
-        String name = map.get("name");
-        if (name == null || name.isEmpty()) {
+        String name = map != null ? map.get("name") : null;
+        if (name == null || name.trim().isEmpty() || name.length() > 100) {
             exchange.sendResponseHeaders(400, -1);
             return;
         }
@@ -38,8 +38,8 @@ public class Handlers {
         }
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         Map<String, String> map = gson.fromJson(body, Map.class);
-        String name = map.get("name");
-        if (name == null || name.isEmpty()) {
+        String name = map != null ? map.get("name") : null;
+        if (name == null || name.trim().isEmpty() || name.length() > 100) {
             exchange.sendResponseHeaders(400, -1);
             return;
         }
@@ -143,7 +143,7 @@ public class Handlers {
                 since = Long.parseLong(queryParams.get("since"));
             }
             if (queryParams.containsKey("limit")) {
-                limit = Integer.parseInt(queryParams.get("limit"));
+                limit = Math.max(1, Math.min(200, Integer.parseInt(queryParams.get("limit"))));
             }
         } catch (NumberFormatException e) {
             exchange.sendResponseHeaders(400, -1);
